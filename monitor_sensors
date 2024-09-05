@@ -1,0 +1,21 @@
+#!/bin/bash
+
+while true; do
+    clear
+    lspci | grep VGA | grep AMD | sed 's/.*: //'
+    sensors | awk '
+    /^amdgpu-pci-/ {p=1}
+    /emerg/ {next}  
+    /^k10temp-pci-/ {p=0} 
+    /^nvme-pci-/ {p=0}
+    p {print} 
+    '
+    lscpu | grep "Model name:" | sed 's/Model name: *//'
+    cat /proc/stat |grep cpu |tail -1|awk '{print ($5*100)/($2+$3+$4+$5+$6+$7+$8+$9+$10)}'|awk '{print "CPU Usage: " 100-$1}'
+    sensors | awk '
+    /^k10temp-pci-/ {p=1} 
+    /^nvme-pci-/ {p=0}
+    p {print} 
+    '
+    sleep 1
+done
