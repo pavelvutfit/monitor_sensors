@@ -1,8 +1,64 @@
 #!/bin/bash
 
-while true; do
-    clear
+# Req:
+# rocm-smi --showuse
+
+clear
+# Hide the cursor for smoother display
+tput civis
+
+breaker() {
+    Cols=$(tput cols)
+    printf '%.0s-' $(seq 1 $Cols)
+    echo
+}
+
+# Function to display CPU name
+display_cpu_name() {
+    CPU_NAME=$(lscpu | grep "Model name:" | sed 's/Model name: *//')
+    echo "CPU: $CPU_NAME"
+}
+
+# Function to display GPU usage
+show_gpu_usage() {
+    rocm-smi --showuse --csv | awk -F',' 'NR==2 {print "GPU Usage: " $2 "%"}'
+}
+
+# Function to calculate and display CPU usage
+calculate_cpu_usage() {
+    CPU_STATS1=$(cat /proc/stat | grep '^cpu ')
+    IDLE1=$(echo $CPU_STATS1 | awk '{print $5}')
+    TOTAL1=$(echo $CPU_STATS1 | awk '{print $2+$3+$4+$5+$6+$7+$8+$9+$10}')
+
+    sleep 0.25
+
+    CPU_STATS2=$(cat /proc/stat | grep '^cpu ')
+    IDLE2=$(echo $CPU_STATS2 | awk '{print $5}')
+    TOTAL2=$(echo $CPU_STATS2 | awk '{print $2+$3+$4+$5+$6+$7+$8+$9+$10}')
+
+    IDLE_DIFF=$((IDLE2 - IDLE1))
+    TOTAL_DIFF=$((TOTAL2 - TOTAL1))
+
+    CPU_USAGE=$((100 * (TOTAL_DIFF - IDLE_DIFF) / TOTAL_DIFF))
+
+    echo "CPU Usage: $CPU_USAGE%"
+}
+
+# Function to display CPU temperature
+display_cpu_temp() {
+    sensors | awk '
+    /^k10temp-pci-/ {p=1} 
+    /^nvme-pci-/ {p=0}
+    /emerg/ {next} 
+    p {print} 
+    '
+}
+
+show_gpu_name() {
     lspci | grep VGA | grep AMD | sed 's/.*: //'
+}
+
+display_gpu_info() {
     sensors | awk '
     /^amdgpu-pci-/ {p=1}
     /emerg/ {next}  
@@ -10,12 +66,53 @@ while true; do
     /^nvme-pci-/ {p=0}
     p {print} 
     '
-    lscpu | grep "Model name:" | sed 's/Model name: *//'
-    cat /proc/stat |grep cpu |tail -1|awk '{print ($5*100)/($2+$3+$4+$5+$6+$7+$8+$9+$10)}'|awk '{print "CPU Usage: " 100-$1}'
-    sensors | awk '
-    /^k10temp-pci-/ {p=1} 
-    /^nvme-pci-/ {p=0}
-    p {print} 
-    '
-    sleep 1
+}
+
+# Function to clear terminal and restore cursor visibility on exit
+cleanup() {
+    tput cnorm       # Restore cursor visibility
+    clear            # Clear the terminal
+    exit             # Exit the script
+}
+
+# Function to display disk usage and I/O statistics
+display_disk_info() {
+    # Display used space, free space, and I/O statistics for disks
+    echo "Disk information (Size, Used, Free, Used %):"
+    df -h | awk '$1 ~ /^\/dev/ {print $1, $2, $3, $4, $5, $6}'
+}
+
+# Trap signals to run the cleanup function on exit
+trap cleanup SIGINT SIGTERM
+
+# Main loop
+while true; do
+    tput sc                # Save the cursor position
+
+    tput cup 0 0           # Move to the top of the screen
+    display_cpu_name       # Display CPU name
+    
+    tput cud1              # Move the cursor down
+    calculate_cpu_usage    # Display CPU usage
+
+    tput cud1              # Move the cursor down
+    display_cpu_temp       # Display CPU temperature
+   
+    breaker                # Design
+
+    tput cud1              # Move the cursor down
+    show_gpu_name          # Display GPU name
+
+    tput cud1              # Move the cursor down
+    show_gpu_usage         # Display GPU usage
+
+    tput cud1              # Move the cursor down
+    display_gpu_info       # Display GPU information
+
+    breaker
+
+    tput cud1              # Move the cursor down
+    display_disk_info       # Display disks
+
+    tput rc                # Restore cursor position to the top for the next loop
 done
