@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#commit from site
+
 # Req:
 # rocm-smi --showuse
 # sudo -i before use (trust me bro)!
