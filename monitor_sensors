@@ -2,6 +2,7 @@
 
 # Req:
 # rocm-smi --showuse
+# sudo -i before use (trust me bro)!
 
 clear
 # Hide the cursor for smoother display
